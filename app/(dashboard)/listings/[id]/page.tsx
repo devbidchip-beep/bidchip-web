@@ -2,10 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { getListingDetail, publishListing } from '@/lib/api';
+import { getListingDetail, publishListing, getBidsForLine } from '@/lib/api';
 import type { ListingDetail, ListingLine } from '@/types/api';
 import { useCountdown } from '@/hooks/useCountdown';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { cn } from '@/lib/utils';
+import { BidForm } from '@/components/bidding/BidForm';
+import { BidList } from '@/components/bidding/BidList';
 
 // ─── Badges ──────────────────────────────────────────────────────────────────
 
@@ -71,12 +74,141 @@ function CountdownDisplay({ endsAt }: { endsAt: string | null }) {
   );
 }
 
+// ─── Bids count badge ─────────────────────────────────────────────────────────
+
+function BidsCountBadge({ lineId }: { lineId: string }) {
+  const [count, setCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    getBidsForLine(lineId)
+      .then((res) => setCount(res.data.filter((b) => b.status === 'active').length))
+      .catch(() => setCount(null));
+  }, [lineId]);
+
+  if (count === null) return null;
+
+  return (
+    <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+      {count} bid{count !== 1 ? 's' : ''}
+    </span>
+  );
+}
+
+// ─── Line row with expandable bids ───────────────────────────────────────────
+
+interface LineRowProps {
+  line: ListingLine;
+  listing: ListingDetail;
+  isOwner: boolean;
+  isSupplier: boolean;
+  currentCompanyId?: string;
+}
+
+function LineRow({ line, listing, isOwner, isSupplier, currentCompanyId }: LineRowProps) {
+  const [expanded, setExpanded] = useState(false);
+  const [showBidForm, setShowBidForm] = useState(false);
+
+  const canBid =
+    isSupplier &&
+    !isOwner &&
+    line.status === 'open' &&
+    listing.status === 'published';
+
+  return (
+    <>
+      <tr className="border-b last:border-0 hover:bg-muted/30">
+        <td className="px-4 py-3 text-muted-foreground">{line.line_no}</td>
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-2">
+            {line.manufacturer?.logo_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={line.manufacturer.logo_url}
+                alt={line.manufacturer.name}
+                className="h-4 w-8 object-contain"
+              />
+            )}
+            <span className="font-medium">{line.mpn_raw}</span>
+          </div>
+        </td>
+        <td className="px-4 py-3 text-muted-foreground">
+          {line.manufacturer?.name ?? line.manufacturer_raw ?? '—'}
+        </td>
+        <td className="px-4 py-3 tabular-nums">{line.quantity.toLocaleString()}</td>
+        <td className="px-4 py-3 tabular-nums">{line.target_unit_price ?? '—'}</td>
+        <td className="px-4 py-3 capitalize">{line.packaging?.replace('_', ' ') ?? 'Any'}</td>
+        <td className="px-4 py-3">
+          <ComplianceBadge status={line.compliance_status} />
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex flex-wrap gap-1">
+            {line.ncnr && <FlagBadge>NCNR</FlagBadge>}
+            {line.part?.is_itar && <FlagBadge>ITAR</FlagBadge>}
+            {line.require_as6081 && <FlagBadge>AS6081</FlagBadge>}
+          </div>
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-2">
+            <BidsCountBadge lineId={line.id} />
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              className="text-xs text-primary hover:underline"
+            >
+              {expanded ? 'Hide Bids' : 'View Bids'}
+            </button>
+            {canBid && (
+              <button
+                onClick={() => setShowBidForm((v) => !v)}
+                className="text-xs text-muted-foreground hover:underline"
+              >
+                {showBidForm ? 'Cancel' : 'Bid'}
+              </button>
+            )}
+          </div>
+        </td>
+      </tr>
+
+      {/* Expanded bids panel */}
+      {expanded && (
+        <tr>
+          <td colSpan={9} className="px-4 pb-4 pt-2 bg-muted/10">
+            <BidList
+              lineId={line.id}
+              listingKind={listing.kind as 'reverse' | 'bom' | 'rfq'}
+              isOwner={isOwner}
+              lineStatus={line.status}
+              listingStatus={listing.status}
+              currentCompanyId={currentCompanyId}
+            />
+          </td>
+        </tr>
+      )}
+
+      {/* Bid form panel */}
+      {showBidForm && (
+        <tr>
+          <td colSpan={9} className="px-4 pb-4 pt-2 bg-muted/10">
+            <BidForm
+              line={line}
+              onSuccess={() => {
+                setShowBidForm(false);
+                setExpanded(true);
+              }}
+            />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function ListingDetailPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
+  const { user } = useCurrentUser();
 
   const [listing, setListing] = useState<ListingDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,6 +238,15 @@ export default function ListingDetailPage() {
       setPublishing(false);
     }
   };
+
+  // NOTE: In a real app, isOwner and isSupplier would come from session/company context.
+  // Here we derive them from what's available. The session user email can be used
+  // to match against company membership in a future hook.
+  // For now, we pass flags as false/true and let BidForm/BidList render appropriately.
+  // TODO: wire up real company membership check once useCompany hook is available.
+  const isOwner = false; // placeholder — replace with real check
+  const isSupplier = true; // placeholder — replace with real check
+  const currentCompanyId = undefined; // placeholder
 
   if (loading) {
     return (
@@ -217,46 +358,19 @@ export default function ListingDetailPage() {
                 <th className="px-4 py-2">Packaging</th>
                 <th className="px-4 py-2">Compliance</th>
                 <th className="px-4 py-2">Flags</th>
+                <th className="px-4 py-2">Bids</th>
               </tr>
             </thead>
             <tbody>
               {listing.lines.map((line) => (
-                <tr key={line.id} className="border-b last:border-0 hover:bg-muted/30">
-                  <td className="px-4 py-3 text-muted-foreground">{line.line_no}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      {line.manufacturer?.logo_url && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={line.manufacturer.logo_url}
-                          alt={line.manufacturer.name}
-                          className="h-4 w-8 object-contain"
-                        />
-                      )}
-                      <span className="font-medium">{line.mpn_raw}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {line.manufacturer?.name ?? line.manufacturer_raw ?? '—'}
-                  </td>
-                  <td className="px-4 py-3 tabular-nums">{line.quantity.toLocaleString()}</td>
-                  <td className="px-4 py-3 tabular-nums">
-                    {line.target_unit_price ?? '—'}
-                  </td>
-                  <td className="px-4 py-3 capitalize">
-                    {line.packaging?.replace('_', ' ') ?? 'Any'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <ComplianceBadge status={line.compliance_status} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex flex-wrap gap-1">
-                      {line.ncnr && <FlagBadge>NCNR</FlagBadge>}
-                      {line.part?.is_itar && <FlagBadge>ITAR</FlagBadge>}
-                      {line.require_as6081 && <FlagBadge>AS6081</FlagBadge>}
-                    </div>
-                  </td>
-                </tr>
+                <LineRow
+                  key={line.id}
+                  line={line}
+                  listing={listing}
+                  isOwner={isOwner}
+                  isSupplier={isSupplier}
+                  currentCompanyId={currentCompanyId}
+                />
               ))}
             </tbody>
           </table>

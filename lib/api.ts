@@ -6,6 +6,9 @@ import type {
   ListingDetail,
   PaginatedResponse,
   CreateListingPayload,
+  Bid,
+  Award,
+  PlaceBidPayload,
 } from '@/types/api';
 
 const api = axios.create({
@@ -66,3 +69,16 @@ export const createListing = (data: CreateListingPayload) =>
 
 export const publishListing = (id: string) =>
   api.post<ListingDetail>(`/listings/${id}/publish/`);
+
+// Bidding
+export const getBidsForLine = (lineId: string) =>
+  api.get<Bid[]>('/bidding/bids/', { params: { line: lineId } });
+
+export const placeBid = (data: PlaceBidPayload) =>
+  api.post<Bid>('/bidding/bids/place/', data);
+
+export const withdrawBid = (bidId: string) =>
+  api.post<Bid>(`/bidding/bids/${bidId}/withdraw/`);
+
+export const awardLine = (lineId: string, awards: { bid: string; quantity: number }[]) =>
+  api.post<Award[]>(`/bidding/lines/${lineId}/award/`, { awards });

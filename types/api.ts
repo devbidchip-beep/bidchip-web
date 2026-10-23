@@ -145,3 +145,42 @@ export interface CreateListingPayload {
   ship_to?: string;
   lines: CreateListingLine[];
 }
+
+export interface Bid {
+  id: string;
+  line: string; // ListingLine id
+  supplier_company: string; // Company id (may be hidden)
+  supplier_company_name?: string; // only visible to staff/buyer
+  placed_by: string;
+  unit_price: string; // Decimal as string
+  quantity_offered: number;
+  date_code_year: number | null;
+  packaging: ListingLine['packaging'];
+  lead_time_days: number;
+  is_exact_match: boolean;
+  exception_reasons: string[]; // 'qty_short' | 'date_code' | 'packaging'
+  status: 'active' | 'withdrawn' | 'won' | 'partially_won' | 'lost';
+  supplier_net_shown: string | null;
+  created_at: string;
+}
+
+export interface Award {
+  id: string;
+  line: string;
+  bid: Bid;
+  quantity_awarded: number;
+  unit_price: string;
+  rank: number;
+  awarded_by: string | null;
+  awarded_at: string;
+  status: 'awarded' | 'converted' | 'cancelled';
+}
+
+export interface PlaceBidPayload {
+  line: string;
+  unit_price: string;
+  quantity_offered: number;
+  date_code_year?: number;
+  packaging?: ListingLine['packaging'];
+  lead_time_days?: number;
+}
