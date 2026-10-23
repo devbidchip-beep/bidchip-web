@@ -9,6 +9,10 @@ import type {
   Bid,
   Award,
   PlaceBidPayload,
+  OrderPricing,
+  Order,
+  CheckoutPayload,
+  CheckoutResponse,
 } from '@/types/api';
 
 const api = axios.create({
@@ -82,3 +86,21 @@ export const withdrawBid = (bidId: string) =>
 
 export const awardLine = (lineId: string, awards: { bid: string; quantity: number }[]) =>
   api.post<Award[]>(`/bidding/lines/${lineId}/award/`, { awards });
+
+// Pricing
+export const previewOrderPricing = (data: CheckoutPayload & { preview: true }) =>
+  api.post<OrderPricing>('/payments/checkout/', { ...data, preview: true });
+
+// Orders
+export const getOrders = (params?: { status?: string }) =>
+  api.get<PaginatedResponse<Order>>('/orders/', { params });
+
+export const getOrderDetail = (id: string) =>
+  api.get<Order>(`/orders/${id}/`);
+
+// Payments
+export const initiateCheckout = (data: CheckoutPayload) =>
+  api.post<CheckoutResponse>('/payments/checkout/', data);
+
+export const getStripeConnectLink = () =>
+  api.post<{ account_link_url: string }>('/payments/stripe/connect/');

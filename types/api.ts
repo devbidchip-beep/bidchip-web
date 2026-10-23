@@ -184,3 +184,92 @@ export interface PlaceBidPayload {
   packaging?: ListingLine['packaging'];
   lead_time_days?: number;
 }
+
+// Pricing
+export interface OrderPricing {
+  principal: string;
+  buyer_fee: string;
+  seller_fee: string;
+  inspection_fee: string;
+  compliance_fee: string;
+  shipping_estimate: string;
+  oem_uplift: string;
+  tax_total: string;
+  card_surcharge: string;
+  card_surcharge_rate: string;
+  grand_total: string;
+  seller_payout: string;
+}
+
+// Orders
+export interface Order {
+  id: string;
+  number: string;
+  buyer_company: string;
+  listing: string;
+  po_number: string | null;
+  status: 'payment_pending' | 'paid' | 'in_fulfillment' | 'partially_shipped' | 'shipped' | 'delivered' | 'completed' | 'cancelled' | 'refunded';
+  ship_to_snapshot: Record<string, string>;
+  currency: string;
+  principal_total: string;
+  buyer_fee_total: string;
+  inspection_fee_total: string;
+  compliance_fee_total: string;
+  shipping_estimate: string;
+  shipping_final: string | null;
+  oem_uplift_total: string;
+  tax_total: string;
+  card_surcharge: string;
+  grand_total: string;
+  paid_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  supplier_orders?: SupplierOrder[];
+}
+
+export interface SupplierOrder {
+  id: string;
+  anonymous_supplier_id: string;
+  status: 'awarded' | 'paid' | 'shipped_to_warehouse' | 'at_warehouse' | 'inspected' | 'failed_inspection' | 'shipped_to_buyer' | 'delivered' | 'payout_released' | 'disputed' | 'cancelled' | 'refunded';
+  risk_tier: 'green' | 'yellow' | 'red';
+  principal: string;
+  seller_fee: string;
+  payout_amount: string;
+  hold_days: number | null;
+  delivered_at: string | null;
+  payout_eligible_at: string | null;
+  lines: OrderLine[];
+}
+
+export interface OrderLine {
+  id: string;
+  listing_line: string;
+  quantity: number;
+  unit_price: string;
+  line_total: string;
+  status: 'pending' | 'received' | 'passed' | 'failed_inspection' | 'shipped' | 'refunded';
+}
+
+export interface CheckoutPayload {
+  listing_id: string;
+  award_ids: string[];
+  ship_to_id: string;
+  payment_method: 'card' | 'ach' | 'wire';
+  po_number?: string;
+}
+
+export interface CheckoutResponse {
+  order_id: string;
+  client_secret: string | null;  // for Stripe card payment
+  grand_total: string;
+  order_number: string;
+}
+
+export interface Payout {
+  id: string;
+  supplier_order: string;
+  amount: string;
+  currency: string;
+  status: 'scheduled' | 'awaiting_release' | 'released' | 'failed' | 'reversed';
+  released_at: string | null;
+}
