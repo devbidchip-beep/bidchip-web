@@ -1,4 +1,12 @@
 import axios from 'axios';
+import type {
+  Part,
+  PartSearchResult,
+  Listing,
+  ListingDetail,
+  PaginatedResponse,
+  CreateListingPayload,
+} from '@/types/api';
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1',
@@ -36,3 +44,25 @@ export function setAuthToken(token: string | null) {
 }
 
 export default api;
+
+// Catalog
+export const searchParts = (q: string, limit = 20) =>
+  api.get<PartSearchResult[]>('/catalog/parts/search/', { params: { q, limit } });
+
+export const getPartDetail = (id: number) => api.get<Part>(`/catalog/parts/${id}/`);
+
+// Listings
+export const getListings = (params?: { status?: string; kind?: string }) =>
+  api.get<PaginatedResponse<Listing>>('/listings/', { params });
+
+export const getPublishedListings = (params?: Record<string, string>) =>
+  api.get<PaginatedResponse<Listing>>('/listings/published/', { params });
+
+export const getListingDetail = (id: string) =>
+  api.get<ListingDetail>(`/listings/${id}/`);
+
+export const createListing = (data: CreateListingPayload) =>
+  api.post<ListingDetail>('/listings/', data);
+
+export const publishListing = (id: string) =>
+  api.post<ListingDetail>(`/listings/${id}/publish/`);

@@ -45,7 +45,7 @@ export interface Listing {
     | 'cancelled'
     | 'expired';
   title: string;
-  ends_at: string;
+  ends_at: string | null;
   currency: string;
   created_at: string;
 }
@@ -60,4 +60,88 @@ export interface PaginatedResponse<T> {
   next: string | null;
   previous: string | null;
   results: T[];
+}
+
+export interface Manufacturer {
+  id: string;
+  name: string;
+  name_normalized: string;
+  logo_url: string | null;
+  is_active: boolean;
+}
+
+export interface Part {
+  id: number; // bigint — number in TS
+  mpn: string;
+  mpn_normalized: string;
+  manufacturer: Manufacturer;
+  description: string;
+  category: string;
+  lifecycle: 'active' | 'nrnd' | 'eol' | 'obsolete' | null;
+  eccn: string | null;
+  is_itar: boolean;
+  hts_code: string | null;
+}
+
+export interface PartSearchResult {
+  id: number;
+  mpn: string;
+  manufacturer_name: string;
+  description: string;
+  category: string;
+  lifecycle: Part['lifecycle'];
+}
+
+export interface ListingLine {
+  id: string;
+  line_no: number;
+  part: Part | null;
+  mpn_raw: string;
+  manufacturer_raw: string;
+  manufacturer: Manufacturer | null;
+  quantity: number;
+  target_unit_price: string | null;
+  date_code_year_min: number | null;
+  packaging: 'reel' | 'cut_tape' | 'tray' | 'tube' | 'bulk' | 'other' | null;
+  allow_exceptions: boolean;
+  allow_split: boolean;
+  require_as6081: boolean;
+  docs_required: boolean;
+  ncnr: boolean;
+  compliance_status: 'clear' | 'flagged' | 'officer_review' | 'approved' | 'rejected';
+  status: 'open' | 'awarded' | 'partially_awarded' | 'no_award';
+}
+
+export interface ListingDetail extends Listing {
+  lines: ListingLine[];
+  ship_to: string | null;
+  starts_at: string | null;
+  ends_at: string | null;
+  duration_minutes: number;
+  invite_only: boolean;
+  anonymous: boolean;
+  published_at: string | null;
+}
+
+export interface CreateListingLine {
+  mpn_raw: string;
+  manufacturer_raw?: string;
+  quantity: number;
+  target_unit_price?: string;
+  date_code_year_min?: number;
+  packaging?: ListingLine['packaging'];
+  allow_exceptions?: boolean;
+  allow_split?: boolean;
+  require_as6081?: boolean;
+  docs_required?: boolean;
+  ncnr?: boolean;
+}
+
+export interface CreateListingPayload {
+  title: string;
+  kind: 'reverse' | 'bom';
+  duration_minutes?: number;
+  currency?: string;
+  ship_to?: string;
+  lines: CreateListingLine[];
 }
