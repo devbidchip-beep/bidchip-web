@@ -1,0 +1,57 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  lint-typecheck-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm' }
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run type-check
+      - run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.STAGING_API_URL }}
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY_TEST }}
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: ${{ secrets.STAGING_URL }}
+
+  deploy-staging:
+    needs: lint-typecheck-build
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to AWS Amplify (staging)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - run: |
+          aws amplify start-job \
+            --app-id ${{ secrets.AMPLIFY_APP_ID }} \
+            --branch-name staging \
+            --job-type RELEASE
+
+  deploy-prod:
+    needs: deploy-staging
+    runs-on: ubuntu-latest
+    environment: production  # requires manual approval
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      - run: |
+          aws amplify start-job \
+            --app-id ${{ secrets.AMPLIFY_APP_ID }} \
+            --branch-name main \
+            --job-type RELEASE

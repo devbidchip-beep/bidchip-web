@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, List, ShoppingCart, User, Cpu, Store, Gavel, Package, Building2, AlertTriangle, MessageSquare, Inbox, Archive, Users, CheckCircle } from 'lucide-react';
+import { LayoutDashboard, List, ShoppingCart, User, Cpu, Store, Gavel, Package, Building2, AlertTriangle, MessageSquare, Inbox, Archive, Users, CheckCircle, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
@@ -130,6 +130,19 @@ export function Sidebar() {
               )}
             </Link>
           )}
+          {/* Account settings — always visible, pinned to bottom of nav */}
+          <Link
+            href="/dashboard/account"
+            className={cn(
+              'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+              pathname === '/dashboard/account' || pathname.startsWith('/dashboard/account/')
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+            )}
+          >
+            <Settings className="h-4 w-4" />
+            Account
+          </Link>
         </nav>
 
         {/* User info footer */}
@@ -233,6 +246,18 @@ export function Sidebar() {
               Approvals
             </Link>
           )}
+          <Link
+            href="/dashboard/account"
+            className={cn(
+              'flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium transition-colors',
+              pathname === '/dashboard/account' || pathname.startsWith('/dashboard/account/')
+                ? 'text-primary'
+                : 'text-muted-foreground',
+            )}
+          >
+            <Settings className="h-5 w-5" />
+            Account
+          </Link>
       </nav>
     </>
   );
