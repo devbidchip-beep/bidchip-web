@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, List, ShoppingCart, User, Cpu, Store, Gavel, Package, Building2 } from 'lucide-react';
+import { LayoutDashboard, List, ShoppingCart, User, Cpu, Store, Gavel, Package, Building2, AlertTriangle, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
@@ -13,6 +13,8 @@ const navItems = [
   { href: '/dashboard/bids', label: 'My Bids', icon: Gavel },
   { href: '/dashboard/orders', label: 'My Orders', icon: ShoppingCart },
   { href: '/dashboard/seller', label: 'Seller Dashboard', icon: Package },
+  { href: '/dashboard/disputes', label: 'Disputes', icon: AlertTriangle },
+  { href: '/dashboard/messages', label: 'Messages', icon: MessageSquare },
   { href: '/account', label: 'Account', icon: User },
 ];
 

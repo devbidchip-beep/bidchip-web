@@ -3,12 +3,16 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { getOrderDetail, buyerConfirmDelivery } from '@/lib/api';
-import type { Order, SupplierOrder, OrderLine, Shipment, Inspection } from '@/types/api';
+import { getOrderDetail, buyerConfirmDelivery, getThread, sendMessage } from '@/lib/api';
+import type { Order, SupplierOrder, OrderLine, Shipment, Inspection, Dispute, MessageThread } from '@/types/api';
 import { PricingBreakdown } from '@/components/payments/PricingBreakdown';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
 import { ShipmentTracker } from '@/components/logistics/ShipmentTracker';
 import { InspectionPanel } from '@/components/logistics/InspectionPanel';
+import { DisputeForm } from '@/components/trust/DisputeForm';
+import { RatingForm } from '@/components/trust/RatingForm';
+import { RiskTierBadge } from '@/components/trust/RiskTierBadge';
+import { MessageThread as MessageThreadComponent } from '@/components/trust/MessageThread';
 import { cn } from '@/lib/utils';
 
 function fmt(value: string): string {
@@ -65,79 +69,275 @@ type SupplierOrderWithLogistics = SupplierOrder & {
   inspection?: Inspection | null;
 };
 
-function SupplierOrderSection({ supplierOrder }: { supplierOrder: SupplierOrderWithLogistics }) {
+// Simple modal wrapper
+function Modal({ open, onClose, title, children }: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  if (!open) return null;
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
-      <div className="px-4 py-3 border-b flex items-center justify-between">
-        <div>
-          <p className="text-sm font-semibold">Supplier {supplierOrder.anonymous_supplier_id}</p>
-          <p className="text-xs text-muted-foreground capitalize">{supplierOrder.status.replace(/_/g, ' ')}</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-lg rounded-xl border bg-card shadow-xl">
+        <div className="flex items-center justify-between border-b px-5 py-4">
+          <h2 className="text-base font-semibold">{title}</h2>
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground">Payout</p>
-          <p className="text-sm font-medium tabular-nums">{fmt(supplierOrder.payout_amount)}</p>
-        </div>
-      </div>
-
-      <div className="px-4 py-4">
-        <OrderStatusTimeline supplierOrder={supplierOrder} />
-      </div>
-
-      {/* Lines table */}
-      {supplierOrder.lines.length > 0 && (
-        <div className="border-t">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50 text-left text-xs text-muted-foreground">
-                  <th className="px-4 py-2">MPN / Line</th>
-                  <th className="px-4 py-2 text-right">Qty</th>
-                  <th className="px-4 py-2 text-right">Unit Price</th>
-                  <th className="px-4 py-2 text-right">Line Total</th>
-                  <th className="px-4 py-2">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {supplierOrder.lines.map((line) => (
-                  <tr key={line.id} className="border-b last:border-0">
-                    <td className="px-4 py-2 text-muted-foreground text-xs">{line.listing_line}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{line.quantity.toLocaleString()}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{fmt(line.unit_price)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums font-medium">{fmt(line.line_total)}</td>
-                    <td className="px-4 py-2">
-                      <span
-                        className={cn(
-                          'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize',
-                          LINE_STATUS_STYLES[line.status],
-                        )}
-                      >
-                        {line.status.replace(/_/g, ' ')}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Inbound shipment tracker */}
-      {supplierOrder.inbound_shipment && (
-        <div className="border-t px-4 py-4">
-          <p className="text-xs text-muted-foreground mb-2">Inbound Shipment</p>
-          <ShipmentTracker shipment={supplierOrder.inbound_shipment} />
-        </div>
-      )}
-
-      {/* Inspection panel (collapsed by default) */}
-      <div className="border-t px-4 py-4">
-        <InspectionPanel
-          inspection={supplierOrder.inspection ?? null}
-          supplierOrderId={supplierOrder.id}
-        />
+        <div className="px-5 py-5 max-h-[80vh] overflow-y-auto">{children}</div>
       </div>
     </div>
+  );
+}
+
+function SupplierOrderSection({
+  supplierOrder,
+  onDisputeOpened,
+  onRatingSubmitted,
+}: {
+  supplierOrder: SupplierOrderWithLogistics;
+  onDisputeOpened: () => void;
+  onRatingSubmitted: () => void;
+}) {
+  const [disputeModalOpen, setDisputeModalOpen] = useState(false);
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [ratingDone, setRatingDone] = useState(false);
+  const [messageThread, setMessageThread] = useState<MessageThread | null>(null);
+  const [threadOpen, setThreadOpen] = useState(false);
+  const [threadLoading, setThreadLoading] = useState(false);
+
+  const canDispute = ['delivered', 'disputed'].includes(supplierOrder.status);
+  const canRate = supplierOrder.status === 'payout_released' && !ratingDone;
+
+  const handleOpenThread = async () => {
+    if (messageThread) {
+      setThreadOpen(true);
+      return;
+    }
+    setThreadLoading(true);
+    try {
+      // Try to fetch threads and find one matching this supplier order
+      const { getThreads } = await import('@/lib/api');
+      const res = await getThreads();
+      const existing = res.data.results.find(
+        (t) => t.supplier_order === supplierOrder.id,
+      );
+      if (existing) {
+        setMessageThread(existing);
+      } else {
+        // Create a minimal stub thread for display if no existing thread found
+        setMessageThread({
+          id: '',
+          listing: null,
+          supplier_order: supplierOrder.id,
+          status: 'open',
+          messages: [],
+          created_at: new Date().toISOString(),
+        });
+      }
+      setThreadOpen(true);
+    } catch {
+      // silently ignore
+    } finally {
+      setThreadLoading(false);
+    }
+  };
+
+  const handleSend = async (body: string) => {
+    if (!messageThread?.id) return;
+    const res = await sendMessage(messageThread.id, body);
+    setMessageThread((prev) =>
+      prev ? { ...prev, messages: [...prev.messages, res.data] } : prev,
+    );
+  };
+
+  const handleThreadRefresh = async () => {
+    if (!messageThread?.id) return;
+    try {
+      const res = await getThread(messageThread.id);
+      setMessageThread(res.data);
+    } catch {
+      // silently ignore
+    }
+  };
+
+  return (
+    <>
+      <div className="rounded-lg border bg-card overflow-hidden">
+        <div className="px-4 py-3 border-b flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold">Supplier {supplierOrder.anonymous_supplier_id}</p>
+                <RiskTierBadge tier={supplierOrder.risk_tier} />
+              </div>
+              <p className="text-xs text-muted-foreground capitalize">{supplierOrder.status.replace(/_/g, ' ')}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Payout</p>
+              <p className="text-sm font-medium tabular-nums">{fmt(supplierOrder.payout_amount)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-4 py-4">
+          <OrderStatusTimeline supplierOrder={supplierOrder} />
+        </div>
+
+        {/* Trust action buttons */}
+        <div className="px-4 pb-3 flex flex-wrap gap-2">
+          <button
+            onClick={handleOpenThread}
+            disabled={threadLoading}
+            className="rounded-md border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            {threadLoading ? 'Loading…' : 'Message Supplier'}
+          </button>
+          {canDispute && (
+            <button
+              onClick={() => setDisputeModalOpen(true)}
+              className="rounded-md border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 transition-colors"
+            >
+              Open Dispute
+            </button>
+          )}
+          {canRate && (
+            <button
+              onClick={() => setRatingModalOpen(true)}
+              className="rounded-md border border-yellow-300 px-3 py-1.5 text-xs font-medium text-yellow-700 hover:bg-yellow-50 transition-colors"
+            >
+              Rate Seller
+            </button>
+          )}
+          {ratingDone && (
+            <span className="text-xs text-green-700 font-medium py-1.5">Rating submitted ✓</span>
+          )}
+        </div>
+
+        {/* Lines table */}
+        {supplierOrder.lines.length > 0 && (
+          <div className="border-t">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50 text-left text-xs text-muted-foreground">
+                    <th className="px-4 py-2">MPN / Line</th>
+                    <th className="px-4 py-2 text-right">Qty</th>
+                    <th className="px-4 py-2 text-right">Unit Price</th>
+                    <th className="px-4 py-2 text-right">Line Total</th>
+                    <th className="px-4 py-2">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {supplierOrder.lines.map((line) => (
+                    <tr key={line.id} className="border-b last:border-0">
+                      <td className="px-4 py-2 text-muted-foreground text-xs">{line.listing_line}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{line.quantity.toLocaleString()}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{fmt(line.unit_price)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums font-medium">{fmt(line.line_total)}</td>
+                      <td className="px-4 py-2">
+                        <span
+                          className={cn(
+                            'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize',
+                            LINE_STATUS_STYLES[line.status],
+                          )}
+                        >
+                          {line.status.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Inbound shipment tracker */}
+        {supplierOrder.inbound_shipment && (
+          <div className="border-t px-4 py-4">
+            <p className="text-xs text-muted-foreground mb-2">Inbound Shipment</p>
+            <ShipmentTracker shipment={supplierOrder.inbound_shipment} />
+          </div>
+        )}
+
+        {/* Inspection panel (collapsed by default) */}
+        <div className="border-t px-4 py-4">
+          <InspectionPanel
+            inspection={supplierOrder.inspection ?? null}
+            supplierOrderId={supplierOrder.id}
+          />
+        </div>
+      </div>
+
+      {/* Dispute modal */}
+      <Modal
+        open={disputeModalOpen}
+        onClose={() => setDisputeModalOpen(false)}
+        title="Open Dispute"
+      >
+        <DisputeForm
+          supplierOrderId={supplierOrder.id}
+          onSuccess={(_dispute: Dispute) => {
+            setDisputeModalOpen(false);
+            onDisputeOpened();
+          }}
+        />
+      </Modal>
+
+      {/* Rating modal */}
+      <Modal
+        open={ratingModalOpen}
+        onClose={() => setRatingModalOpen(false)}
+        title="Rate Seller"
+      >
+        <RatingForm
+          supplierOrderId={supplierOrder.id}
+          direction="buyer_to_supplier"
+          onSuccess={() => {
+            setRatingDone(true);
+            setRatingModalOpen(false);
+            onRatingSubmitted();
+          }}
+        />
+      </Modal>
+
+      {/* Message thread modal */}
+      <Modal
+        open={threadOpen}
+        onClose={() => setThreadOpen(false)}
+        title="Message Supplier"
+      >
+        {messageThread ? (
+          messageThread.id ? (
+            <div className="h-96 flex flex-col min-h-0">
+              <MessageThreadComponent
+                thread={messageThread}
+                onSend={async (body) => {
+                  await handleSend(body);
+                  await handleThreadRefresh();
+                }}
+              />
+            </div>
+          ) : (
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              <p>No message thread exists for this supplier order yet.</p>
+              <p className="mt-1">A thread will be created when you or the supplier initiates contact.</p>
+            </div>
+          )
+        ) : null}
+      </Modal>
+    </>
   );
 }
 
@@ -145,6 +345,7 @@ type OrderWithLogistics = Order & {
   outbound_shipment?: Shipment;
   supplier_orders?: SupplierOrderWithLogistics[];
 };
+
 
 export default function OrderDetailPage() {
   const params = useParams();
@@ -286,9 +487,7 @@ export default function OrderDetailPage() {
               >
                 Confirm Receipt
               </button>
-              <button className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50">
-                Open Dispute
-              </button>
+              <span className="text-xs text-muted-foreground">Open disputes from each supplier section below.</span>
             </div>
           ) : (
             <div className="rounded-lg border border-green-200 bg-green-50 p-4 space-y-3">
@@ -336,7 +535,17 @@ export default function OrderDetailPage() {
         <div className="space-y-4">
           <h2 className="text-base font-semibold">Supplier Orders</h2>
           {order.supplier_orders.map((so) => (
-            <SupplierOrderSection key={so.id} supplierOrder={so} />
+            <SupplierOrderSection
+              key={so.id}
+              supplierOrder={so}
+              onDisputeOpened={async () => {
+                const res = await getOrderDetail(id);
+                setOrder(res.data as OrderWithLogistics);
+              }}
+              onRatingSubmitted={() => {
+                // No-op refresh needed; rating state is local per section
+              }}
+            />
           ))}
         </div>
       )}

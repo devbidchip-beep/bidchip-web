@@ -14,6 +14,10 @@ import type {
   CheckoutPayload,
   CheckoutResponse,
   RateQuote,
+  Dispute,
+  Rating,
+  Message,
+  MessageThread,
 } from '@/types/api';
 
 const api = axios.create({
@@ -121,3 +125,32 @@ export const markShipped = (supplierOrderId: string, data: { carrier: string; tr
 
 export const buyerConfirmDelivery = (supplierOrderId: string) =>
   api.post<void>(`/logistics/supplier-orders/${supplierOrderId}/buyer-confirm-delivery/`);
+
+// Trust
+export const getDisputes = () =>
+  api.get<PaginatedResponse<Dispute>>('/trust/disputes/');
+
+export const openDispute = (data: { supplier_order: string; reason: string; description: string }) =>
+  api.post<Dispute>('/trust/disputes/', data);
+
+export const resolveDispute = (id: string, data: { status: string; resolution_note: string }) =>
+  api.patch<Dispute>(`/trust/disputes/${id}/`, data);
+
+export const submitRating = (data: {
+  supplier_order: string;
+  direction: string;
+  quality: number;
+  communication: number;
+  shipping: number;
+  documentation: number;
+  comment?: string;
+}) => api.post<Rating>('/trust/ratings/', data);
+
+export const getThreads = () =>
+  api.get<PaginatedResponse<MessageThread>>('/trust/threads/');
+
+export const getThread = (id: string) =>
+  api.get<MessageThread>(`/trust/threads/${id}/`);
+
+export const sendMessage = (threadId: string, body: string) =>
+  api.post<Message>(`/trust/threads/${threadId}/messages/`, { body });

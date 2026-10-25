@@ -341,3 +341,57 @@ export interface LabTest {
   report: string | null;
   completed_at: string | null;
 }
+
+export interface Dispute {
+  id: string;
+  supplier_order: string;
+  opened_by: string;
+  reason: 'not_as_described' | 'quantity' | 'counterfeit_suspected' | 'damaged' | 'not_received' | 'other';
+  description: string;
+  status: 'open' | 'awaiting_return' | 'under_review' | 'resolved_buyer' | 'resolved_seller' | 'split' | 'withdrawn';
+  resolution_note: string;
+  resolved_by: string | null;
+  opened_at: string;
+  resolved_at: string | null;
+}
+
+export interface Rating {
+  id: string;
+  supplier_order: string | null;
+  rater_company: string;
+  ratee_company: string;
+  direction: 'buyer_to_supplier' | 'supplier_to_buyer';
+  quality: number;
+  communication: number;
+  shipping: number;
+  documentation: number;
+  average_score: number;
+  comment: string;
+  created_at: string;
+}
+
+export interface Message {
+  id: string;
+  body: string;
+  moderation_status: 'pending' | 'approved' | 'blocked';
+  sent_at: string;
+  is_own: boolean;
+}
+
+export interface MessageThread {
+  id: string;
+  listing: string | null;
+  supplier_order: string | null;
+  status: 'open' | 'closed';
+  messages: Message[];
+  created_at: string;
+}
+
+export interface RiskAssessment {
+  id: string;
+  supplier_order: string;
+  tier: 'green' | 'yellow' | 'red';
+  score: number;
+  override_tier: 'green' | 'yellow' | 'red' | null;
+  assessed_at: string;
+}
