@@ -395,3 +395,79 @@ export interface RiskAssessment {
   override_tier: 'green' | 'yellow' | 'red' | null;
   assessed_at: string;
 }
+
+export interface IntakeFile {
+  id: string;
+  filename: string;
+  mime: string;
+  kind: 'xlsx' | 'csv' | 'pdf' | 'image' | 'body_text';
+  text_extracted: boolean;
+}
+
+export interface IntakeExtractionLine {
+  mpn: string;
+  manufacturer: string | null;
+  quantity: number;
+  target_price: number | null;
+  date_code_year: number | null;
+  packaging: string | null;
+  ncnr: boolean;
+  require_as6081: boolean;
+  notes: string | null;
+  confidence: number;
+  catalog_match: 'exact' | 'fuzzy' | 'none';
+  part_id: number | null;
+  manufacturer_logo: string | null;
+}
+
+export interface IntakeExtraction {
+  id: string;
+  model: string;
+  prompt_version: string;
+  result: {
+    title?: string;
+    lines: IntakeExtractionLine[];
+    overall_confidence: number;
+  };
+  confidence: string;
+  line_count: number;
+  listing: { id: string; number: string } | null;
+}
+
+export interface IntakeMessage {
+  id: string;
+  channel: 'email' | 'upload' | 'api';
+  from_email: string | null;
+  status: 'received' | 'extracting' | 'needs_review' | 'draft_created' | 'failed' | 'rejected_sender';
+  subject: string;
+  received_at: string;
+  files: IntakeFile[];
+  extractions: IntakeExtraction[];
+}
+
+export interface InventoryItem {
+  id: string;
+  company: string;
+  part: number | null;
+  mpn_raw: string;
+  manufacturer_raw: string;
+  quantity: number;
+  date_code_year: number | null;
+  packaging: string | null;
+  unit_price: string | null;
+  currency: string;
+  ship_from_country: string;
+  source: 'csv' | 'email' | 'api' | 'manual';
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface InventoryImport {
+  id: string;
+  status: 'queued' | 'processing' | 'done' | 'failed';
+  rows_total: number;
+  rows_ok: number;
+  rows_failed: number;
+  error_report_url: string | null;
+  created_at: string;
+}

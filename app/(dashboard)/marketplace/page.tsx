@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getPublishedListings } from '@/lib/api';
 import type { Listing } from '@/types/api';
 import { ListingCard } from '@/components/listings/ListingCard';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 
 const PAGE_SIZE = 12;
 
@@ -11,6 +12,9 @@ type KindFilter = 'all' | 'reverse' | 'bom' | 'rfq';
 type SortOption = 'newest' | 'ending_soon';
 
 export default function MarketplacePage() {
+  const { user } = useCurrentUser();
+  const isSupplier = (user as { company?: { is_supplier?: boolean } } | null)?.company?.is_supplier ?? false;
+
   const [listings, setListings] = useState<Listing[]>([]);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -62,6 +66,31 @@ export default function MarketplacePage() {
         <h1 className="text-2xl font-bold tracking-tight">Marketplace</h1>
         <p className="text-muted-foreground">Browse open listings from buyers</p>
       </div>
+
+      {/* Interesting for You — supplier only */}
+      {isSupplier && (
+        <section className="rounded-xl border bg-card p-5 shadow-sm">
+          <div className="mb-3 flex items-center gap-2">
+            <svg
+              className="h-5 w-5 text-yellow-500"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path d="M12 2a7 7 0 015.292 11.584l-.292.336V17a1 1 0 01-.883.993L16 18H8a1 1 0 01-1-1v-3.08l-.292-.336A7 7 0 0112 2zm1 17v1a1 1 0 01-2 0v-1h2z" />
+            </svg>
+            <h2 className="text-base font-semibold">Interesting for You</h2>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Listings that match your inventory — upload your inventory to see matches here.
+          </p>
+          <div className="mt-4 rounded-lg border bg-muted/30 p-8 text-center">
+            <p className="text-sm text-muted-foreground">No matches yet.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Upload your inventory to see matching listings.
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* Filter bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

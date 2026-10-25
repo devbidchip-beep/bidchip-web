@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, List, ShoppingCart, User, Cpu, Store, Gavel, Package, Building2, AlertTriangle, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, List, ShoppingCart, User, Cpu, Store, Gavel, Package, Building2, AlertTriangle, MessageSquare, Inbox, Archive } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
@@ -22,6 +22,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user } = useCurrentUser();
   const staffRole = (user as { staff_role?: string | null } | null)?.staff_role;
+  const isSupplier = (user as { company?: { is_supplier?: boolean } } | null)?.company?.is_supplier ?? false;
 
   return (
     <>
@@ -50,6 +51,32 @@ export function Sidebar() {
               {label}
             </Link>
           ))}
+          <Link
+            href="/dashboard/intake"
+            className={cn(
+              'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+              pathname === '/dashboard/intake' || pathname.startsWith('/dashboard/intake/')
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+            )}
+          >
+            <Inbox className="h-4 w-4" />
+            Pending Imports
+          </Link>
+          {isSupplier && (
+            <Link
+              href="/dashboard/inventory"
+              className={cn(
+                'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                pathname === '/dashboard/inventory' || pathname.startsWith('/dashboard/inventory/')
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+              )}
+            >
+              <Archive className="h-4 w-4" />
+              My Inventory
+            </Link>
+          )}
           {staffRole === 'warehouse' && (
             <Link
               href="/dashboard/warehouse"
@@ -92,20 +119,46 @@ export function Sidebar() {
             {label}
           </Link>
         ))}
-        {staffRole === 'warehouse' && (
           <Link
-            href="/dashboard/warehouse"
+            href="/dashboard/intake"
             className={cn(
               'flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium transition-colors',
-              pathname === '/dashboard/warehouse' || pathname.startsWith('/dashboard/warehouse/')
+              pathname === '/dashboard/intake' || pathname.startsWith('/dashboard/intake/')
                 ? 'text-primary'
                 : 'text-muted-foreground',
             )}
           >
-            <Building2 className="h-5 w-5" />
-            Warehouse
+            <Inbox className="h-5 w-5" />
+            Imports
           </Link>
-        )}
+          {isSupplier && (
+            <Link
+              href="/dashboard/inventory"
+              className={cn(
+                'flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium transition-colors',
+                pathname === '/dashboard/inventory' || pathname.startsWith('/dashboard/inventory/')
+                  ? 'text-primary'
+                  : 'text-muted-foreground',
+              )}
+            >
+              <Archive className="h-5 w-5" />
+              Inventory
+            </Link>
+          )}
+          {staffRole === 'warehouse' && (
+            <Link
+              href="/dashboard/warehouse"
+              className={cn(
+                'flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium transition-colors',
+                pathname === '/dashboard/warehouse' || pathname.startsWith('/dashboard/warehouse/')
+                  ? 'text-primary'
+                  : 'text-muted-foreground',
+              )}
+            >
+              <Building2 className="h-5 w-5" />
+              Warehouse
+            </Link>
+          )}
       </nav>
     </>
   );

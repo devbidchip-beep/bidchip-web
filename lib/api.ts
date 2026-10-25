@@ -18,6 +18,8 @@ import type {
   Rating,
   Message,
   MessageThread,
+  IntakeMessage,
+  InventoryItem,
 } from '@/types/api';
 
 const api = axios.create({
@@ -154,3 +156,36 @@ export const getThread = (id: string) =>
 
 export const sendMessage = (threadId: string, body: string) =>
   api.post<Message>(`/trust/threads/${threadId}/messages/`, { body });
+
+// Intake
+export const uploadIntakeFile = (file: File) => {
+  const form = new FormData();
+  form.append('file', file);
+  return api.post<{ intake_id: string; status: string }>('/intake/upload/', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+
+export const getIntakeMessages = (params?: { status?: string }) =>
+  api.get<PaginatedResponse<IntakeMessage>>('/intake/', { params });
+
+export const getIntakeDetail = (id: string) =>
+  api.get<IntakeMessage>(`/intake/${id}/`);
+
+// Inventory
+export const getInventory = (params?: { page?: number }) =>
+  api.get<PaginatedResponse<InventoryItem>>('/catalog/inventory/', { params });
+
+export const addInventoryItem = (data: Partial<InventoryItem>) =>
+  api.post<InventoryItem>('/catalog/inventory/', data);
+
+export const deleteInventoryItem = (id: string) =>
+  api.delete(`/catalog/inventory/${id}/`);
+
+export const uploadInventoryCSV = (file: File) => {
+  const form = new FormData();
+  form.append('file', file);
+  return api.post<{ import_id: string; status: string }>('/catalog/inventory/upload/', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
