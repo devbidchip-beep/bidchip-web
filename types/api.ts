@@ -273,3 +273,71 @@ export interface Payout {
   status: 'scheduled' | 'awaiting_release' | 'released' | 'failed' | 'reversed';
   released_at: string | null;
 }
+
+export interface Shipment {
+  id: string;
+  leg: 'inbound' | 'outbound' | 'return_to_bidchip' | 'return_to_owner';
+  carrier: 'ups' | 'fedex' | 'dhl' | 'other';
+  service_code: string;
+  tracking_number: string;
+  paid_by: 'supplier' | 'buyer' | 'bidchip';
+  cost_estimated: string;
+  cost_actual: string;
+  status: 'draft' | 'label_created' | 'in_transit' | 'delivered' | 'exception' | 'returned';
+  shipped_at: string | null;
+  delivered_at: string | null;
+  is_partial: boolean;
+  packages: Package[];
+  rate_quotes: RateQuote[];
+}
+
+export interface Package {
+  id: string;
+  length_cm: string;
+  width_cm: string;
+  height_cm: string;
+  weight_kg: string;
+  sized_by: 'ai' | 'warehouse' | 'supplier';
+}
+
+export interface RateQuote {
+  id: string;
+  carrier: 'ups' | 'fedex' | 'dhl';
+  service_code: string;
+  service_name: string;
+  amount: string;
+  currency: string;
+  transit_days: number | null;
+  is_next_day: boolean;
+  chosen: boolean;
+  quoted_at: string;
+}
+
+export interface Inspection {
+  id: string;
+  supplier_order: string;
+  inspector: string;
+  level: 'standard' | 'extended' | 'full_lab';
+  result: 'passed' | 'failed' | 'partial' | null;
+  notes: string;
+  counted_quantity: number | null;
+  inspected_at: string | null;
+  photos: InspectionPhoto[];
+}
+
+export interface InspectionPhoto {
+  id: string;
+  file_url: string;
+  caption: string;
+  order_line: string | null;
+}
+
+export interface LabTest {
+  id: string;
+  order_line: string;
+  method: string;
+  price: string;
+  result: 'pass' | 'fail' | 'inconclusive' | null;
+  report: string | null;
+  completed_at: string | null;
+}

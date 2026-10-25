@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { getOrderDetail } from '@/lib/api';
-import type { Order, SupplierOrder, OrderLine } from '@/types/api';
+import { getOrderDetail, buyerConfirmDelivery } from '@/lib/api';
+import type { Order, SupplierOrder, OrderLine, Shipment, Inspection } from '@/types/api';
 import { PricingBreakdown } from '@/components/payments/PricingBreakdown';
 import { OrderStatusTimeline } from '@/components/orders/OrderStatusTimeline';
+import { ShipmentTracker } from '@/components/logistics/ShipmentTracker';
+import { InspectionPanel } from '@/components/logistics/InspectionPanel';
 import { cn } from '@/lib/utils';
 
 function fmt(value: string): string {
@@ -58,7 +60,12 @@ function buildPricingFromOrder(order: Order) {
   };
 }
 
-function SupplierOrderSection({ supplierOrder }: { supplierOrder: SupplierOrder }) {
+type SupplierOrderWithLogistics = SupplierOrder & {
+  inbound_shipment?: Shipment;
+  inspection?: Inspection | null;
+};
+
+function SupplierOrderSection({ supplierOrder }: { supplierOrder: SupplierOrderWithLogistics }) {
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       <div className="px-4 py-3 border-b flex items-center justify-between">
@@ -114,9 +121,30 @@ function SupplierOrderSection({ supplierOrder }: { supplierOrder: SupplierOrder 
           </div>
         </div>
       )}
+
+      {/* Inbound shipment tracker */}
+      {supplierOrder.inbound_shipment && (
+        <div className="border-t px-4 py-4">
+          <p className="text-xs text-muted-foreground mb-2">Inbound Shipment</p>
+          <ShipmentTracker shipment={supplierOrder.inbound_shipment} />
+        </div>
+      )}
+
+      {/* Inspection panel (collapsed by default) */}
+      <div className="border-t px-4 py-4">
+        <InspectionPanel
+          inspection={supplierOrder.inspection ?? null}
+          supplierOrderId={supplierOrder.id}
+        />
+      </div>
     </div>
   );
 }
+
+type OrderWithLogistics = Order & {
+  outbound_shipment?: Shipment;
+  supplier_orders?: SupplierOrderWithLogistics[];
+};
 
 export default function OrderDetailPage() {
   const params = useParams();
@@ -124,19 +152,42 @@ export default function OrderDetailPage() {
   const searchParams = useSearchParams();
   const id = params.id as string;
 
-  const [order, setOrder] = useState<Order | null>(null);
+  const [order, setOrder] = useState<OrderWithLogistics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingReceipt, setConfirmingReceipt] = useState(false);
+  const [receiptLoading, setReceiptLoading] = useState(false);
+  const [receiptError, setReceiptError] = useState<string | null>(null);
 
   const checkoutSuccess = searchParams.get('checkout') === 'success';
   const paymentSuccess = searchParams.get('payment') === 'success';
 
   useEffect(() => {
     getOrderDetail(id)
-      .then((res) => setOrder(res.data))
+      .then((res) => setOrder(res.data as OrderWithLogistics))
       .catch((err) => setError(err instanceof Error ? err.message : 'Failed to load order'))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const handleConfirmReceipt = async () => {
+    if (!order?.supplier_orders?.length) return;
+    setReceiptLoading(true);
+    setReceiptError(null);
+    try {
+      // Confirm delivery for each supplier order
+      await Promise.all(
+        order.supplier_orders.map((so) => buyerConfirmDelivery(so.id)),
+      );
+      setConfirmingReceipt(false);
+      // Refresh order
+      const res = await getOrderDetail(id);
+      setOrder(res.data as OrderWithLogistics);
+    } catch (err) {
+      setReceiptError(err instanceof Error ? err.message : 'Failed to confirm receipt');
+    } finally {
+      setReceiptLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -226,13 +277,54 @@ export default function OrderDetailPage() {
       )}
 
       {order.status === 'delivered' && (
-        <div className="flex gap-3">
-          <button className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700">
-            Confirm Receipt
-          </button>
-          <button className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50">
-            Open Dispute
-          </button>
+        <div className="space-y-3">
+          {!confirmingReceipt ? (
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmingReceipt(true)}
+                className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700"
+              >
+                Confirm Receipt
+              </button>
+              <button className="rounded-md border border-red-300 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-50">
+                Open Dispute
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-green-200 bg-green-50 p-4 space-y-3">
+              <p className="text-sm font-medium text-green-900">Confirm Receipt</p>
+              <p className="text-sm text-green-800">
+                Are you sure? This will start the 5-business-day payout clock for all suppliers on this order.
+              </p>
+              {receiptError && (
+                <p className="text-sm text-destructive">{receiptError}</p>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={handleConfirmReceipt}
+                  disabled={receiptLoading}
+                  className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+                >
+                  {receiptLoading ? 'Confirming…' : 'Yes, Confirm Receipt'}
+                </button>
+                <button
+                  onClick={() => { setConfirmingReceipt(false); setReceiptError(null); }}
+                  disabled={receiptLoading}
+                  className="rounded-md border px-4 py-2 text-sm font-medium text-muted-foreground hover:bg-muted disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Outbound shipment tracker */}
+      {order.outbound_shipment && (
+        <div className="space-y-2">
+          <h2 className="text-base font-semibold">Outbound Shipment</h2>
+          <ShipmentTracker shipment={order.outbound_shipment} />
         </div>
       )}
 

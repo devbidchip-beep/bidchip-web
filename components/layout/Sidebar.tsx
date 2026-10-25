@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, List, ShoppingCart, User, Cpu, Store, Gavel, Package } from 'lucide-react';
+import { LayoutDashboard, List, ShoppingCart, User, Cpu, Store, Gavel, Package, Building2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
@@ -19,6 +19,7 @@ const navItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useCurrentUser();
+  const staffRole = (user as { staff_role?: string | null } | null)?.staff_role;
 
   return (
     <>
@@ -47,6 +48,20 @@ export function Sidebar() {
               {label}
             </Link>
           ))}
+          {staffRole === 'warehouse' && (
+            <Link
+              href="/dashboard/warehouse"
+              className={cn(
+                'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                pathname === '/dashboard/warehouse' || pathname.startsWith('/dashboard/warehouse/')
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+              )}
+            >
+              <Building2 className="h-4 w-4" />
+              Warehouse
+            </Link>
+          )}
         </nav>
 
         {/* User info footer */}
@@ -75,6 +90,20 @@ export function Sidebar() {
             {label}
           </Link>
         ))}
+        {staffRole === 'warehouse' && (
+          <Link
+            href="/dashboard/warehouse"
+            className={cn(
+              'flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium transition-colors',
+              pathname === '/dashboard/warehouse' || pathname.startsWith('/dashboard/warehouse/')
+                ? 'text-primary'
+                : 'text-muted-foreground',
+            )}
+          >
+            <Building2 className="h-5 w-5" />
+            Warehouse
+          </Link>
+        )}
       </nav>
     </>
   );

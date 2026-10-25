@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import api from '@/lib/api';
-import type { SupplierOrder } from '@/types/api';
+import type { SupplierOrder, Shipment } from '@/types/api';
 import { StripeConnectBanner } from '@/components/payments/StripeConnectBanner';
+import { MarkShippedForm } from '@/components/logistics/MarkShippedForm';
+import { ShipmentTracker } from '@/components/logistics/ShipmentTracker';
 import { cn } from '@/lib/utils';
 
 function fmt(value: string): string {
@@ -35,61 +37,15 @@ const STATUS_LABEL: Partial<Record<SupplierOrder['status'], string>> = {
   refunded: 'Refunded',
 };
 
-interface ShipFormProps {
-  supplierOrderId: string;
-  onShipped: () => void;
-}
-
-function MarkShippedForm({ supplierOrderId, onShipped }: ShipFormProps) {
-  const [tracking, setTracking] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      await api.post(`/orders/supplier-orders/${supplierOrderId}/ship/`, {
-        tracking_number: tracking,
-      });
-      onShipped();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update shipment');
-      setLoading(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="mt-3 flex gap-2">
-      <input
-        type="text"
-        value={tracking}
-        onChange={(e) => setTracking(e.target.value)}
-        placeholder="Tracking number"
-        required
-        className="flex-1 rounded-md border bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-      />
-      <button
-        type="submit"
-        disabled={loading}
-        className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-      >
-        {loading ? 'Saving…' : 'Confirm'}
-      </button>
-      {error && <p className="text-xs text-destructive mt-1">{error}</p>}
-    </form>
-  );
-}
-
 interface SupplierOrderCardProps {
-  order: SupplierOrder & { order_number?: string };
+  order: SupplierOrder & { order_number?: string; inbound_shipment?: Shipment };
   onRefresh: () => void;
 }
 
 function SupplierOrderCard({ order, onRefresh }: SupplierOrderCardProps) {
   const [showShipForm, setShowShipForm] = useState(false);
   const isReadyToShip = order.status === 'paid';
+  const inboundShipment = order.inbound_shipment ?? null;
 
   return (
     <div className="rounded-lg border bg-card p-4 space-y-3">
@@ -129,23 +85,37 @@ function SupplierOrderCard({ order, onRefresh }: SupplierOrderCardProps) {
         ))}
       </div>
 
+      {/* Inbound shipment tracker */}
+      {inboundShipment && inboundShipment.leg === 'inbound' && (
+        <ShipmentTracker shipment={inboundShipment} />
+      )}
+
       {/* Actions */}
       {isReadyToShip && (
-        <div>
-          <button
-            onClick={() => setShowShipForm((v) => !v)}
-            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            {showShipForm ? 'Cancel' : 'Mark Shipped'}
-          </button>
-          {showShipForm && (
-            <MarkShippedForm
-              supplierOrderId={order.id}
-              onShipped={() => {
-                setShowShipForm(false);
-                onRefresh();
-              }}
-            />
+        <div className="space-y-2">
+          {!showShipForm ? (
+            <button
+              onClick={() => setShowShipForm(true)}
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Mark Shipped
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <button
+                onClick={() => setShowShipForm(false)}
+                className="text-xs text-muted-foreground hover:underline"
+              >
+                Cancel
+              </button>
+              <MarkShippedForm
+                supplierOrderId={order.id}
+                onSuccess={() => {
+                  setShowShipForm(false);
+                  onRefresh();
+                }}
+              />
+            </div>
           )}
         </div>
       )}

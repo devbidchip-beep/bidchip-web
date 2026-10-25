@@ -13,6 +13,7 @@ import type {
   Order,
   CheckoutPayload,
   CheckoutResponse,
+  RateQuote,
 } from '@/types/api';
 
 const api = axios.create({
@@ -104,3 +105,19 @@ export const initiateCheckout = (data: CheckoutPayload) =>
 
 export const getStripeConnectLink = () =>
   api.post<{ account_link_url: string }>('/payments/stripe/connect/');
+
+// Logistics
+export const getShipmentRates = (shipmentId: string) =>
+  api.post<RateQuote[]>(`/logistics/shipments/${shipmentId}/rates/`);
+
+export const chooseRate = (shipmentId: string, rateQuoteId: string) =>
+  api.post<void>(`/logistics/shipments/${shipmentId}/choose-rate/`, { rate_quote_id: rateQuoteId });
+
+export const createLabel = (shipmentId: string) =>
+  api.post<{ tracking_number: string; label_url: string }>(`/logistics/shipments/${shipmentId}/label/`);
+
+export const markShipped = (supplierOrderId: string, data: { carrier: string; tracking_number: string }) =>
+  api.post<void>(`/logistics/supplier-orders/${supplierOrderId}/mark-shipped/`, data);
+
+export const buyerConfirmDelivery = (supplierOrderId: string) =>
+  api.post<void>(`/logistics/supplier-orders/${supplierOrderId}/buyer-confirm-delivery/`);
