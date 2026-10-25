@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, List, ShoppingCart, User, Cpu, Store, Gavel, Package, Building2, AlertTriangle, MessageSquare, Inbox, Archive } from 'lucide-react';
+import { LayoutDashboard, List, ShoppingCart, User, Cpu, Store, Gavel, Package, Building2, AlertTriangle, MessageSquare, Inbox, Archive, Users, CheckCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
@@ -18,11 +18,17 @@ const navItems = [
   { href: '/account', label: 'Account', icon: User },
 ];
 
+const CORPORATE_ROLES = ['owner', 'manager', 'finance'];
+
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useCurrentUser();
   const staffRole = (user as { staff_role?: string | null } | null)?.staff_role;
   const isSupplier = (user as { company?: { is_supplier?: boolean } } | null)?.company?.is_supplier ?? false;
+  const memberRole = (user as { memberRole?: string | null } | null)?.memberRole ?? null;
+  const isCorporateRole = memberRole ? CORPORATE_ROLES.includes(memberRole) : false;
+  const isMember = memberRole != null;
+  const pendingApprovalCount = (user as { pendingApprovalCount?: number } | null)?.pendingApprovalCount ?? 0;
 
   return (
     <>
@@ -91,6 +97,39 @@ export function Sidebar() {
               Warehouse
             </Link>
           )}
+          {isCorporateRole && (
+            <Link
+              href="/dashboard/corporate"
+              className={cn(
+                'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                pathname === '/dashboard/corporate' || pathname.startsWith('/dashboard/corporate/')
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+              )}
+            >
+              <Users className="h-4 w-4" />
+              Team
+            </Link>
+          )}
+          {isMember && (
+            <Link
+              href="/dashboard/approvals"
+              className={cn(
+                'relative flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                pathname === '/dashboard/approvals' || pathname.startsWith('/dashboard/approvals/')
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+              )}
+            >
+              <CheckCircle className="h-4 w-4" />
+              Approvals
+              {pendingApprovalCount > 0 && (
+                <span className="ml-auto rounded-full bg-yellow-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                  {pendingApprovalCount}
+                </span>
+              )}
+            </Link>
+          )}
         </nav>
 
         {/* User info footer */}
@@ -157,6 +196,41 @@ export function Sidebar() {
             >
               <Building2 className="h-5 w-5" />
               Warehouse
+            </Link>
+          )}
+          {isCorporateRole && (
+            <Link
+              href="/dashboard/corporate"
+              className={cn(
+                'flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium transition-colors',
+                pathname === '/dashboard/corporate' || pathname.startsWith('/dashboard/corporate/')
+                  ? 'text-primary'
+                  : 'text-muted-foreground',
+              )}
+            >
+              <Users className="h-5 w-5" />
+              Team
+            </Link>
+          )}
+          {isMember && (
+            <Link
+              href="/dashboard/approvals"
+              className={cn(
+                'relative flex flex-1 flex-col items-center gap-1 py-3 text-xs font-medium transition-colors',
+                pathname === '/dashboard/approvals' || pathname.startsWith('/dashboard/approvals/')
+                  ? 'text-primary'
+                  : 'text-muted-foreground',
+              )}
+            >
+              <span className="relative">
+                <CheckCircle className="h-5 w-5" />
+                {pendingApprovalCount > 0 && (
+                  <span className="absolute -top-1 -right-1 rounded-full bg-yellow-500 px-1 text-[9px] font-bold leading-tight text-white">
+                    {pendingApprovalCount}
+                  </span>
+                )}
+              </span>
+              Approvals
             </Link>
           )}
       </nav>

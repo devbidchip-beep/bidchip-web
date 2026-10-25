@@ -20,6 +20,12 @@ import type {
   MessageThread,
   IntakeMessage,
   InventoryItem,
+  CompanyMember,
+  Invitation,
+  Budget,
+  OrderLimit,
+  ApprovalRequest,
+  SpendingReportRow,
 } from '@/types/api';
 
 const api = axios.create({
@@ -189,3 +195,37 @@ export const uploadInventoryCSV = (file: File) => {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 };
+
+// Corporate
+export const inviteMember = (data: { email: string; role: string }) =>
+  api.post<Invitation>('/corporate/invite/', data);
+
+export const acceptInvitation = (token: string) =>
+  api.post<{ company_name: string; role: string }>('/corporate/accept-invitation/', { token });
+
+export const getMembers = () =>
+  api.get<CompanyMember[]>('/corporate/members/');
+
+export const suspendMember = (memberId: string) =>
+  api.post<void>(`/corporate/members/${memberId}/suspend/`);
+
+export const getBudgets = () =>
+  api.get<Budget[]>('/corporate/budgets/');
+
+export const setBudget = (data: { member: string; period: string; period_start: string; amount: string }) =>
+  api.post<Budget>('/corporate/budgets/', data);
+
+export const getOrderLimit = (memberId: string) =>
+  api.get<OrderLimit>(`/corporate/limits/${memberId}/`);
+
+export const setOrderLimit = (memberId: string, max_order_amount: string) =>
+  api.put<OrderLimit>(`/corporate/limits/${memberId}/`, { max_order_amount });
+
+export const getApprovals = () =>
+  api.get<ApprovalRequest[]>('/corporate/approvals/');
+
+export const decideApproval = (id: string, approved: boolean, note?: string) =>
+  api.post<ApprovalRequest>(`/corporate/approvals/${id}/decide/`, { approved, note });
+
+export const getSpendingReport = (from: string, to: string) =>
+  api.get<SpendingReportRow[]>('/corporate/spending/', { params: { from, to } });

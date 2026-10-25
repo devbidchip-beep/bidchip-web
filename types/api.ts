@@ -471,3 +471,53 @@ export interface InventoryImport {
   error_report_url: string | null;
   created_at: string;
 }
+
+export interface Invitation {
+  id: string;
+  company: string;
+  email: string;
+  role: CompanyMember['role'];
+  expires_at: string;
+  accepted_at: string | null;
+  created_at: string;
+}
+
+export interface Budget {
+  id: string;
+  member: string;
+  period_start: string;
+  period: 'month' | 'quarter';
+  amount: string;
+  currency: string;
+  spent_this_period: string;
+}
+
+export interface OrderLimit {
+  id: string;
+  member: string;
+  max_order_amount: string;
+  currency: string;
+}
+
+export interface ApprovalRequest {
+  id: string;
+  company: string;
+  requested_by_name: string;
+  approver_name: string | null;
+  subject_type: 'listing_publish' | 'checkout';
+  listing: string | null;
+  order: string | null;
+  amount: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  decided_at: string | null;
+  note: string;
+  created_at: string;
+}
+
+export interface SpendingReportRow {
+  member_name: string;
+  role: CompanyMember['role'];
+  order_count: number;
+  total_spent: string;
+  currency: string;
+}
